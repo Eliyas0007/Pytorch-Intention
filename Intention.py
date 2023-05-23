@@ -34,8 +34,7 @@ class Intention(nn.Module):
         key = rearrange(key, 'b s (nh hd) -> b nh s hd', nh=self.num_head, hd=self.head_dim)
         value = rearrange(value, 'b s (nh hd) -> b nh s hd', nh=self.num_head, hd=self.head_dim)
 
-        attention_score = query @ torch.linalg.inv(key_T @ key) @ key_T
-
+        attention_score = (torch.linalg.inv(key_T @ key) @ key_T) @ value
         if mask:
             size = attention_score.shape[-1]
             attention_score = attention_score + torch.triu(torch.full((size, size), float('-inf'), device=self.device, requires_grad=False), diagonal=1)
@@ -43,7 +42,7 @@ class Intention(nn.Module):
         attention_score_scaled = attention_score / self.embed_dim**(1/2)
         attention_score_scaled = self.soft_max(attention_score_scaled)
 
-        out = attention_score_scaled @ value
+        out = query @ attention_score_scaled
         out = rearrange(out, 'b nh s hd -> b s (nh hd)')
         out = self.fc(out)
 
