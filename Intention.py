@@ -20,9 +20,8 @@ class Intention(nn.Module):
         self.soft_max = nn.Softmax(dim=-1)
         self.fc = nn.Linear(embed_dim, embed_dim)
 
+    def forward(self, x: torch.Tensor, decoder_in: torch.Tensor = None, mask=False):
 
-    def forward(self, x: torch.Tensor, decoder_in : torch.Tensor =None, mask=False):
-        
         value = self.value(x)
         key = self.key(x)
         if decoder_in is not None:
@@ -37,18 +36,16 @@ class Intention(nn.Module):
 
         kk = key_T @ key
         kk = self.alpha * torch.eye(kk.shape[-1], device=self.device) + kk
-
         kk_inv = torch.inverse(kk)
+        attention_score = (kk_inv @ key_T) @ value
 
-        attention_score = query @ kk_inv @ key_T
         if mask:
             size = attention_score.shape[-1]
             attention_score = attention_score + torch.triu(torch.full((size, size), float('-inf'), device=self.device, requires_grad=False), diagonal=1)
 
-        attention_score_scaled = attention_score / self.embed_dim**(1/2)
-        attention_score_scaled = self.soft_max(attention_score_scaled)
+        attention_score_scaled = self.soft_max(attention_score)
 
-        out = attention_score_scaled @ value
+        out = query @ attention_score_scaled
         out = rearrange(out, 'b nh s hd -> b s (nh hd)')
         out = self.fc(out)
 
