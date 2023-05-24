@@ -11,6 +11,7 @@ class Intention(nn.Module):
         self.num_head = num_head
         self.head_dim = embed_dim // num_head
         self.device = device
+        self.alpha = nn.Parameter(torch.rand(1))
         assert embed_dim % num_head == 0, 'embed_dim must be divisible by num_head'
 
         self.query = nn.Linear(embed_dim, embed_dim)
@@ -34,7 +35,12 @@ class Intention(nn.Module):
         key = rearrange(key, 'b s (nh hd) -> b nh s hd', nh=self.num_head, hd=self.head_dim)
         value = rearrange(value, 'b s (nh hd) -> b nh s hd', nh=self.num_head, hd=self.head_dim)
 
-        attention_score = (torch.linalg.inv(key_T @ key) @ key_T) @ value
+        kk = key_T @ key
+        kk = self.alpha * torch.eye(kk.shape[-1], device=self.device) + kk
+
+        kk_inv = torch.inverse(kk)
+
+        attention_score = query @ kk_inv @ key_T
         if mask:
             size = attention_score.shape[-1]
             attention_score = attention_score + torch.triu(torch.full((size, size), float('-inf'), device=self.device, requires_grad=False), diagonal=1)
@@ -42,19 +48,9 @@ class Intention(nn.Module):
         attention_score_scaled = attention_score / self.embed_dim**(1/2)
         attention_score_scaled = self.soft_max(attention_score_scaled)
 
-        out = query @ attention_score_scaled
+        out = attention_score_scaled @ value
         out = rearrange(out, 'b nh s hd -> b s (nh hd)')
         out = self.fc(out)
 
         return out
 
-
-if __name__ == '__main__':
-
-    # (batch_size, time_step, feature_size)
-    t = torch.rand(1, 10, 256)
-    device = 'cpu'
-    model = Intention(embed_dim=256, num_head=8, device=device)
-    model.to(device)
-    y = model(t)
-    print(y.shape)
