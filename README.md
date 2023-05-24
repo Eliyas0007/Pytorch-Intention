@@ -4,6 +4,8 @@
 
 All optional paths mentioned in the paper is ommited
 
+**Feel free to contribute if you think this implementation is wrong**
+
 <p align="center">
     <img src="https://github.com/Eliyas0007/Pytorch-Intention/blob/main/images/intention.png" alt="long range prediction"> 
 </p>
